@@ -1,0 +1,8 @@
+pragma solidity >=0.4.22;
+contract Hash{
+    bytes32 public hash;
+    function gen(uint256 choice, uint256 nonce) public payable
+    {
+        hash=keccak256(abi.encodePacked(choice,nonce));}
+
+}

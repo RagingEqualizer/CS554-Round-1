@@ -1,0 +1,108 @@
+pragma solidity >=0.5.0;
+contract Lottery{
+    address payable[3] public  player; //Stores the player addresses
+    uint256 public PlayersVerified=0; //Number of players whose strings have been verified to match their original commitments
+    uint256 public PlayersSent=0; //Number of players who have sent their initial commitments
+    uint256[3] public playerstatus1=[0,0,0]; //Individual status of player commitments; 1= sent , 0=not sent
+    uint256[3] public playerstatus2=[0,0,0]; //Individual status of player string verifications; 1=verified, 0=not verified
+    uint256[3] public playerstring; //Strings provided by each player in Round 2
+    bytes32[3] public commitment; //Commitments provided by each player in Round 1
+    uint256 public BetAmount; //Amount of money which constitutes the actual bet
+    uint256 public FairPenalty; //Amount of money reserved till the end as a fair play penalty
+    uint256 Round1status=0; //Used to track if round 1 is finished or not; 1=round 1 finished, 0= not finished
+    uint256 public expiration=2**256-1; //Expiration time is stored here, initial value is the highest value possible to ensure Timeoutout() cannot be called quickly unless actual expiration time is set
+    
+    constructor(uint256 bet, uint256 penalty) public payable //Sets the initial Bet amount and the fair play penalty
+    {
+        BetAmount=(bet*1 ether);
+        FairPenalty=(penalty*1 ether);
+        expiration=now+24 hours;
+        
+    }
+    modifier OnlyPlayers //Access control to ensure only players can call the specific function
+    {
+        uint z=0;
+        for(uint i=0;i<=2;i++)
+        {
+            if(msg.sender==player[i])
+            z=1;
+        }
+        require(z==1);
+        _;
+    }
+    function Round1(bytes32 commit) public payable //Round 1: This is where player send their initial hashed commitments i.e. H(s1),H(s2) and H(s3). It ensures only 
+    {                                              //three players can participate and sets an expiration time in case one of them doesn;t make a commitment
+        require(msg.value==(BetAmount+FairPenalty));
+        require(PlayersSent<=2);
+        commitment[PlayersSent]=commit;
+        player[PlayersSent]=msg.sender;
+        playerstatus1[PlayersSent]=1;
+        PlayersSent+=1;
+        if(PlayersSent==3)
+        {Round1status=1;}
+    }
+    function Round2(uint256 str) public payable OnlyPlayers //Round 2: This is where players send their initial strings so they can be hashed and their initial commitments verified
+    {                                           //This ensures all players verify their commitments and renews the expiration time in case they don't.
+        uint k;
+        require(Round1status==1);
+        for(uint j=0;j<=2;j++)
+        {
+            if(player[j]==msg.sender)
+            {
+                k=j;
+                break;
+            }
+        }
+        if(keccak256(abi.encodePacked(str))==commitment[k])
+        {
+            PlayersVerified=PlayersVerified+1;
+            playerstatus2[k]=1;
+            playerstring[k]=str;
+            if(k==2)
+            {
+                expiration= now +24 hours;
+            }
+        }
+    }
+    function Result() public payable OnlyPlayers //Final Result and payments:This is where the result is calculated once everyone has verified their commitments.
+    {                                            //Winner gets the entirety of the betting amount whereas the other two get their fair play penalty back to incentivize fair play.
+        require(PlayersVerified==3);
+        uint256 finalstr=playerstring[0]+playerstring[1]+playerstring[2];
+        uint256 winner=(finalstr%3);
+        for(uint x=0;x<=2;x++)
+        {
+            if(x==winner)
+            {
+                player[winner].transfer(address(this).balance-(FairPenalty*2));
+            }
+            else
+            {
+                player[x].transfer(FairPenalty);
+            }
+        }
+    }
+    function Timeout() public payable //Function to be used in case a player tries to not play during either rounds. Refunds the money during Round 1 and penalizes
+    {                                 // the cheater in Round 2 by not returning their fair play penalty in addition to the original bet amount.
+        require(now>expiration);
+        if(Round1status==1)
+        {
+            for(uint x=0;x<=2;x++)
+            {
+                if(playerstatus2[x]==1)
+                {
+                    player[x].transfer((address(this).balance)/PlayersVerified);
+                }
+            }
+        }
+        else
+        {
+            for(uint x=0;x<=2;x++)
+            {
+                if(playerstatus1[x]==1)
+                {
+                    player[x].transfer((address(this).balance)/PlayersSent);
+                }
+            }
+        }
+    }
+}
