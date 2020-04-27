@@ -12,7 +12,7 @@ contract Lottery{
     uint256 Round1status=0; //Used to track if round 1 is finished or not; 1=round 1 finished, 0= not finished
     uint256 public expiration=2**256-1; //Expiration time is stored here, initial value is the highest value possible to ensure Timeoutout() cannot be called quickly unless actual expiration time is set
     
-    constructor(uint256 bet, uint256 penalty) public payable //Sets the initial Bet amount and the fair play penalty
+    constructor(uint256 bet, uint256 penalty) public payable //Sets the initial Bet amount, the fair play penalty and set the expiration time for Round 1 to 24 hours from now. 
     {
         BetAmount=(bet*1 ether);
         FairPenalty=(penalty*1 ether);
@@ -31,7 +31,7 @@ contract Lottery{
         _;
     }
     function Round1(bytes32 commit) public payable //Round 1: This is where player send their initial hashed commitments i.e. H(s1),H(s2) and H(s3). It ensures only 
-    {                                              //three players can participate and sets an expiration time in case one of them doesn;t make a commitment
+    {                                              //three players can participate and extends the expiration time for Round 2
         require(msg.value==(BetAmount+FairPenalty));
         require(PlayersSent<=2);
         commitment[PlayersSent]=commit;
@@ -39,7 +39,10 @@ contract Lottery{
         playerstatus1[PlayersSent]=1;
         PlayersSent+=1;
         if(PlayersSent==3)
-        {Round1status=1;}
+        {
+            Round1status=1;
+            expiration=now + 24 hours;
+        }
     }
     function Round2(uint256 str) public payable OnlyPlayers //Round 2: This is where players send their initial strings so they can be hashed and their initial commitments verified
     {                                           //This ensures all players verify their commitments and renews the expiration time in case they don't.
@@ -58,10 +61,6 @@ contract Lottery{
             PlayersVerified=PlayersVerified+1;
             playerstatus2[k]=1;
             playerstring[k]=str;
-            if(k==2)
-            {
-                expiration= now +24 hours;
-            }
         }
     }
     function Result() public payable OnlyPlayers //Final Result and payments:This is where the result is calculated once everyone has verified their commitments.
