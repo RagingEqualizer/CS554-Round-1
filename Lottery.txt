@@ -33,9 +33,9 @@ contract Lottery{
     }
     function Round1(bytes32 commit) public payable //Round 1: This is where player send their initial hashed commitments i.e. H(s1),H(s2) and H(s3). It ensures only 
     {                                              //three players can participate and extends the expiration time for Round 2
-        require(commit!=commitment[0]&&commit!=commitment[1]&&commit!=commitment[2]);
-        require(msg.value==(BetAmount+FairPenalty));
-        require(PlayersSent<=2);
+        require(commit!=commitment[0]&&commit!=commitment[1]&&commit!=commitment[2],'Hash unacceptable please try again');
+        require(msg.value==(BetAmount+FairPenalty),'Amount not corrext');
+        require(PlayersSent<=2,'No vacancies left');
         commitment[PlayersSent]=commit;
         player[PlayersSent]=msg.sender;
         playerstatus1[PlayersSent]=1;
@@ -49,7 +49,7 @@ contract Lottery{
     function Round2(uint256 str) public payable OnlyPlayers //Round 2: This is where players send their initial strings so they can be hashed and their initial commitments verified
     {                                           //This ensures all players verify their commitments and renews the expiration time in case they don't.
         uint k;
-        require(Round1status==1);
+        require(Round1status==1,'Round 1 not finished yet');
         for(uint j=0;j<=2;j++)
         {
             if(player[j]==msg.sender)
@@ -67,7 +67,7 @@ contract Lottery{
     }
     function Result() public payable OnlyPlayers //Final Result and payments:This is where the result is calculated once everyone has verified their commitments.
     {                                            //Winner gets the entirety of the betting amount whereas the other two get their fair play penalty back to incentivize fair play.
-        require(PlayersVerified==3);
+        require(PlayersVerified==3,'All players havent been verified yet');
         uint256 finalstr=playerstring[0]+playerstring[1]+playerstring[2];
         uint256 winner=(finalstr%3);
         for(uint x=0;x<=2;x++)
@@ -84,7 +84,7 @@ contract Lottery{
     }
     function Timeout() public payable //Function to be used in case a player tries to not play during either rounds. Refunds the money during Round 1 and penalizes
     {                                 // the cheater in Round 2 by not returning their fair play penalty in addition to the original bet amount.
-        require(now>expiration);
+        require(now>expiration,'Time is not up yet');
         uint256 balance=(address(this).balance);
         if(Round1status==1)
         {
