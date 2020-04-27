@@ -11,12 +11,13 @@ contract Lottery{
     uint256 public FairPenalty; //Amount of money reserved till the end as a fair play penalty
     uint256 Round1status=0; //Used to track if round 1 is finished or not; 1=round 1 finished, 0= not finished
     uint256 public expiration=2**256-1; //Expiration time is stored here, initial value is the highest value possible to ensure Timeoutout() cannot be called quickly unless actual expiration time is set
-    
-    constructor(uint256 bet, uint256 penalty) public payable //Sets the initial Bet amount, the fair play penalty and set the expiration time for Round 1 to 24 hours from now. 
+    uint256 increment;//Acmount of time to be added to expiration time when needed
+    constructor(uint256 bet, uint256 penalty,uint256 exp) public payable //Sets the initial Bet amount, the fair play penalty and set the expiration time for Round 1 to the given minutes from now. 
     {
         BetAmount=(bet*1 ether);
         FairPenalty=(penalty*1 ether);
-        expiration=now+24 hours;
+        increment=exp;
+        expiration=now+(exp*1 minutes);
         
     }
     modifier OnlyPlayers //Access control to ensure only players can call the specific function
@@ -32,6 +33,7 @@ contract Lottery{
     }
     function Round1(bytes32 commit) public payable //Round 1: This is where player send their initial hashed commitments i.e. H(s1),H(s2) and H(s3). It ensures only 
     {                                              //three players can participate and extends the expiration time for Round 2
+        require(commit!=commitment[0]&&commit!=commitment[1]&&commit!=commitment[2]);
         require(msg.value==(BetAmount+FairPenalty));
         require(PlayersSent<=2);
         commitment[PlayersSent]=commit;
@@ -83,13 +85,14 @@ contract Lottery{
     function Timeout() public payable //Function to be used in case a player tries to not play during either rounds. Refunds the money during Round 1 and penalizes
     {                                 // the cheater in Round 2 by not returning their fair play penalty in addition to the original bet amount.
         require(now>expiration);
+        uint256 balance=(address(this).balance);
         if(Round1status==1)
         {
             for(uint x=0;x<=2;x++)
             {
                 if(playerstatus2[x]==1)
                 {
-                    player[x].transfer((address(this).balance)/PlayersVerified);
+                    player[x].transfer(balance/PlayersVerified);
                 }
             }
         }
@@ -99,7 +102,7 @@ contract Lottery{
             {
                 if(playerstatus1[x]==1)
                 {
-                    player[x].transfer((address(this).balance)/PlayersSent);
+                    player[x].transfer(balance/PlayersSent);
                 }
             }
         }
